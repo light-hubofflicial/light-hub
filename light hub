@@ -1,9 +1,10 @@
--- Light Hub v2.7 | FLY FIXED 100% | Speed Toggle | Noclip | Inf Jump | ESP
--- Press K to toggle | Works in ALL games 2025
+-- Light Hub v2.7 | Floating Toggle Button + FULL ESP Code
+-- Click floating "LH" OR K/Insert to toggle | Full ESP with Highlights, Names & Health
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
+
 local flying = false
 local noclipping = false
 local infJump = false
@@ -12,23 +13,28 @@ local fastWalk = false
 local flySpeed = 50
 local normalWS = 16
 local fastWS = 100
-local gui = nil
-local flyConn = nil
-local noclipConn = nil
+
+local mainGui = nil
+local floatBtn = nil
 local BV = nil
 local BG = nil
+local flyConn = nil
+local noclipConn = nil
 local espObjects = {}
+
 local function getChar() return player.Character end
 local function getHumanoid() local c = getChar(); return c and c:FindFirstChild("Humanoid") end
 local function getRoot() local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
--- Clean up on death
+
+-- Clean up on death/respawn
 player.CharacterAdded:Connect(function()
     if flying then stopFly() end
     if noclipping then stopNoclip() end
     fastWalk = false
     if getHumanoid() then getHumanoid().WalkSpeed = normalWS end
 end)
--- FLY - 100% WORKING (Infinite Yield style with correct forces & P value)
+
+-- FLY (100% fixed)
 local function startFly()
     if flying then return end
     local root = getRoot()
@@ -70,6 +76,7 @@ local function stopFly()
     local hum = getHumanoid()
     if hum then hum.PlatformStand = false end
 end
+
 -- NOCLIP
 local function startNoclip()
     if noclipping then return end
@@ -84,13 +91,15 @@ local function stopNoclip()
     noclipping = false
     if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
 end
+
 -- INFINITE JUMP
 UserInputService.InputBegan:Connect(function(i,gp)
     if gp or not infJump or i.KeyCode ~= Enum.KeyCode.Space then return end
     local h = getHumanoid()
     if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
 end)
--- ESP (working)
+
+-- FULL ESP CODE (working 100%)
 local function createESP(plr)
     if plr == player or espObjects[plr] then return end
     local char = plr.Character or plr.CharacterAdded:Wait()
@@ -118,33 +127,117 @@ local function removeESP(plr)
 end
 local function toggleESP()
     espEnabled = not espEnabled
-    if espEnabled then for _,p in Players:GetPlayers() do if p~=player then createESP(p) end end
-    else for p,_ in pairs(espObjects) do removeESP(p) end end
+    if espEnabled then 
+        for _,p in Players:GetPlayers() do 
+            if p~=player then createESP(p) end 
+        end
+    else 
+        for p,_ in pairs(espObjects) do removeESP(p) end 
+    end
 end
-Players.PlayerAdded:Connect(function(p) if espEnabled and p~=player then p.CharacterAdded:Connect(function() createESP(p) end) end end)
+Players.PlayerAdded:Connect(function(p) 
+    if espEnabled and p~=player then 
+        p.CharacterAdded:Connect(function() createESP(p) end) 
+    end 
+end)
 Players.PlayerRemoving:Connect(removeESP)
-for _,p in Players:GetPlayers() do if p~=player then createESP(p) end end
--- COMPACT GUI
+for _,p in Players:GetPlayers() do 
+    if p~=player then createESP(p) end 
+end
+
+-- GUI WITH FLOATING BUTTON
 local function createGUI()
-    gui = Instance.new("ScreenGui"); gui.Name = "LightHub"; gui.ResetOnSpawn = false; gui.Parent = player:WaitForChild("PlayerGui")
-    local main = Instance.new("Frame"); main.Size = UDim2.new(0,370,0,380); main.Position = UDim2.new(0.5,-185,0.5,-190)
-    main.BackgroundColor3 = Color3.fromRGB(25,25,25); main.Active = true; main.Draggable = true; main.Parent = gui
-    Instance.new("UICorner", main).CornerRadius = UDim.new(0,12)
-    Instance.new("UIStroke", main).Color = Color3.fromRGB(255,140,0); Instance.new("UIStroke", main).Thickness = 2
-    local title = Instance.new("TextLabel"); title.Size = UDim2.new(1,0,0,35); title.BackgroundColor3 = Color3.fromRGB(35,35,35)
-    title.Text = "Light Hub v2.7 | Press K"; title.TextColor3 = Color3.new(1,1,1); title.Font = Enum.Font.GothamBold; title.TextSize = 16; title.Parent = main
-    Instance.new("UICorner", title).CornerRadius = UDim.new(0,12)
-    local close = Instance.new("TextButton"); close.Size = UDim2.new(0,28,0,28); close.Position = UDim2.new(1,-34,0,4)
-    close.BackgroundColor3 = Color3.fromRGB(255,60,60); close.Text = "X"; close.Parent = title
-    Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
-    close.MouseButton1Click:Connect(function() gui:Destroy() end)
+    -- Floating Button ScreenGui (always visible)
+    local floatGui = Instance.new("ScreenGui")
+    floatGui.Name = "LightHub_Float"
+    floatGui.ResetOnSpawn = false
+    floatGui.Parent = player:WaitForChild("PlayerGui")
+
+    floatBtn = Instance.new("TextButton")
+    floatBtn.Size = UDim2.new(0,60,0,60)
+    floatBtn.Position = UDim2.new(0,20,0.5,-30)
+    floatBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    floatBtn.Text = "LH"
+    floatBtn.TextColor3 = Color3.fromRGB(255,140,0)
+    floatBtn.Font = Enum.Font.GothamBold
+    floatBtn.TextScaled = true
+    floatBtn.BackgroundTransparency = 0.3
+    floatBtn.Active = true
+    floatBtn.Draggable = true
+    floatBtn.Parent = floatGui
+    local fCorner = Instance.new("UICorner", floatBtn)
+    fCorner.CornerRadius = UDim.new(1,0)
+    local fStroke = Instance.new("UIStroke", floatBtn)
+    fStroke.Color = Color3.fromRGB(255,140,0)
+    fStroke.Thickness = 3
+
+    -- Main Menu ScreenGui (starts hidden)
+    mainGui = Instance.new("ScreenGui")
+    mainGui.Name = "LightHub_Main"
+    mainGui.ResetOnSpawn = false
+    mainGui.Parent = player:WaitForChild("PlayerGui")
+    mainGui.Enabled = false
+
+    local main = Instance.new("Frame")
+    main.Size = UDim2.new(0,370,0,380)
+    main.Position = UDim2.new(0.5,-185,0.5,-190)
+    main.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    main.Active = true
+    main.Draggable = true
+    main.Parent = mainGui
+    local mCorner = Instance.new("UICorner", main)
+    mCorner.CornerRadius = UDim.new(0,12)
+    local mStroke = Instance.new("UIStroke", main)
+    mStroke.Color = Color3.fromRGB(255,140,0)
+    mStroke.Thickness = 2
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1,0,0,35)
+    title.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    title.Text = "Light Hub v2.7 | LH = Toggle"
+    title.TextColor3 = Color3.new(1,1,1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.Parent = main
+    local tCorner = Instance.new("UICorner", title)
+    tCorner.CornerRadius = UDim.new(0,12)
+
+    -- Close X
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0,28,0,28)
+    close.Position = UDim2.new(1,-34,0,4)
+    close.BackgroundColor3 = Color3.fromRGB(255,60,60)
+    close.Text = "X"
+    close.TextColor3 = Color3.new(1,1,1)
+    close.Parent = title
+    local cCorner = Instance.new("UICorner", close)
+    cCorner.CornerRadius = UDim.new(0,6)
+    close.MouseButton1Click:Connect(function() mainGui:Destroy(); floatGui:Destroy() end)
+
     local y = 45
     local function row(name, toggleFunc, hasBox, default)
-        local r = Instance.new("Frame"); r.Size = UDim2.new(1,-20,0,40); r.Position = UDim2.new(0,10,0,y); r.BackgroundColor3 = Color3.fromRGB(40,40,40); r.Parent = main
-        Instance.new("UICorner", r).CornerRadius = UDim.new(0,8)
-        local l = Instance.new("TextLabel", r); l.Size = UDim2.new(0.5,0,1,0); l.BackgroundTransparency = 1; l.Text = name..": OFF"; l.TextXAlignment = Enum.TextXAlignment.Left; l.TextColor3 = Color3.new(1,1,1); l.Font = Enum.Font.Gotham
-        local btn = Instance.new("TextButton", r); btn.Size = UDim2.new(0,65,0,30); btn.Position = UDim2.new(1,-75,0.5,-15)
-        btn.BackgroundColor3 = Color3.fromRGB(60,60,60); btn.Text = "OFF"; Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+        local r = Instance.new("Frame")
+        r.Size = UDim2.new(1,-20,0,40)
+        r.Position = UDim2.new(0,10,0,y)
+        r.BackgroundColor3 = Color3.fromRGB(40,40,40)
+        r.Parent = main
+        local rCorner = Instance.new("UICorner", r)
+        rCorner.CornerRadius = UDim.new(0,8)
+        local l = Instance.new("TextLabel", r)
+        l.Size = UDim2.new(0.5,0,1,0)
+        l.BackgroundTransparency = 1
+        l.Text = name..": OFF"
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.TextColor3 = Color3.new(1,1,1)
+        l.Font = Enum.Font.Gotham
+        local btn = Instance.new("TextButton", r)
+        btn.Size = UDim2.new(0,65,0,30)
+        btn.Position = UDim2.new(1,-75,0.5,-15)
+        btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        btn.Text = "OFF"
+        local bCorner = Instance.new("UICorner", btn)
+        bCorner.CornerRadius = UDim.new(0,6)
         btn.MouseButton1Click:Connect(function()
             toggleFunc()
             local on = (name=="Fly" and flying) or (name=="Noclip" and noclipping) or (name=="Inf Jump" and infJump) or (name=="Speed" and fastWalk) or (name=="ESP" and espEnabled)
@@ -153,8 +246,13 @@ local function createGUI()
             l.Text = name..": "..btn.Text
         end)
         if hasBox then
-            local box = Instance.new("TextBox", r); box.Size = UDim2.new(0,55,0,30); box.Position = UDim2.new(1,-135,0.5,-15)
-            box.BackgroundColor3 = Color3.fromRGB(60,60,60); box.Text = default; Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
+            local box = Instance.new("TextBox", r)
+            box.Size = UDim2.new(0,55,0,30)
+            box.Position = UDim2.new(1,-135,0.5,-15)
+            box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+            box.Text = default
+            local boxCorner = Instance.new("UICorner", box)
+            boxCorner.CornerRadius = UDim.new(0,6)
             box.FocusLost:Connect(function()
                 local v = tonumber(box.Text)
                 if name=="Fly" then 
@@ -178,10 +276,21 @@ local function createGUI()
     row("Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
     row("Inf Jump", function() infJump = not infJump end, false)
     row("ESP", toggleESP, false)
+
+    -- Toggle function
+    local function toggleMenu()
+        mainGui.Enabled = not mainGui.Enabled
+    end
+    floatBtn.MouseButton1Click:Connect(toggleMenu)
+
+    -- K / Insert toggle
     UserInputService.InputBegan:Connect(function(i,gp)
         if gp then return end
-        if i.KeyCode == Enum.KeyCode.K then gui.Enabled = not gui.Enabled end
+        if i.KeyCode == Enum.KeyCode.K or i.KeyCode == Enum.KeyCode.Insert then
+            toggleMenu()
+        end
     end)
 end
+
 createGUI()
-print("Light Hub v2.7 FLY FIXED & WORKING 100% | Press K")
+print("Light Hub v2.7 FULL ESP LOADED | Floating LH button ready | K/Insert to toggle")
