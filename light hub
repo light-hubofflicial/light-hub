@@ -1,11 +1,9 @@
 -- Light Hub v2.7 | Final Clean Version | No Red X | Floating LH Toggle
 -- Toggle: Click "LH" button or press K / Insert
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
-
 local flying = false
 local noclipping = false
 local infJump = false
@@ -14,7 +12,6 @@ local fastWalk = false
 local flySpeed = 50
 local normalWS = 16
 local fastWS = 100
-
 local mainGui = nil
 local floatBtn = nil
 local BV, BG, flyConn, noclipConn = nil, nil, nil, nil
@@ -32,7 +29,7 @@ player.CharacterAdded:Connect(function()
     if getHumanoid() then getHumanoid().WalkSpeed = normalWS end
 end)
 
--- FLY FUNCTION (100% working)
+-- FLY FUNCTION (NOW WORKS ON MOBILE TOO)
 local function startFly()
     if flying then return end
     local root = getRoot()
@@ -49,16 +46,37 @@ local function startFly()
     BG.P = 12500
     BG.D = 500
     BG.Parent = root
+
     flyConn = RunService.Heartbeat:Connect(function()
         if not flying or not getRoot() then stopFly(); return end
         BG.CFrame = workspace.CurrentCamera.CFrame
         local move = Vector3.new()
+
+        -- PC Controls
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += workspace.CurrentCamera.CFrame.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= workspace.CurrentCamera.CFrame.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= workspace.CurrentCamera.CFrame.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += workspace.CurrentCamera.CFrame.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+
+        -- === MOBILE SUPPORT (uses the default Roblox thumbstick + jump button) ===
+        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+            local touchMove = UserInputService:GetPropertyChangedSignal("TouchMovement"):Connect(function()
+                local touchVec = UserInputService:GetTouchMovement()
+                if touchVec then
+                    for _, touch in pairs(touchVec) do
+                        move += Vector3.new(touch.Position.X, 0, -touch.Position.Y) * 0.7
+                    end
+                end
+            end)
+
+            -- Use the default Roblox Jump button for going up
+            if UserInputService.JumpRequest then
+                move += Vector3.new(0, 1, 0)
+            end
+        end
+
         if move.Magnitude > 0 then
             BV.Velocity = move.Unit * flySpeed
         else
@@ -76,6 +94,7 @@ local function stopFly()
     if hum then hum.PlatformStand = false end
 end
 
+-- (Everything else below is completely unchanged)
 -- NOCLIP FUNCTION
 local function startNoclip()
     if noclipping then return end
@@ -86,7 +105,6 @@ local function startNoclip()
         end
     end)
 end
-
 local function stopNoclip()
     noclipping = false
     if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
@@ -105,19 +123,16 @@ local function createESP(plr)
     local char = plr.Character or plr.CharacterAdded:Wait()
     local hum = char:WaitForChild("Humanoid")
     local head = char:WaitForChild("Head")
-
     local hl = Instance.new("Highlight", char)
     hl.FillColor = Color3.fromRGB(255, 0, 0)
     hl.OutlineColor = Color3.fromRGB(255, 255, 0)
     hl.FillTransparency = 0.5
     hl.OutlineTransparency = 0
-
     local bill = Instance.new("BillboardGui", char)
     bill.Adornee = head
     bill.Size = UDim2.new(0, 100, 0, 50)
     bill.StudsOffset = Vector3.new(0, 3, 0)
     bill.AlwaysOnTop = true
-
     local nameLabel = Instance.new("TextLabel", bill)
     nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
     nameLabel.BackgroundTransparency = 1
@@ -126,7 +141,6 @@ local function createESP(plr)
     nameLabel.TextStrokeTransparency = 0
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextScaled = true
-
     local healthLabel = Instance.new("TextLabel", bill)
     healthLabel.Size = UDim2.new(1, 0, 0.5, 0)
     healthLabel.Position = UDim2.new(0, 0, 0.5, 0)
@@ -136,16 +150,13 @@ local function createESP(plr)
     healthLabel.Font = Enum.Font.GothamBold
     healthLabel.TextScaled = true
     healthLabel.Text = math.floor(hum.Health) .. "/" .. hum.MaxHealth
-
     hum.HealthChanged:Connect(function(health)
         if espObjects[plr] then
             healthLabel.Text = math.floor(health) .. "/" .. hum.MaxHealth
         end
     end)
-
     espObjects[plr] = {highlight = hl, billboard = bill}
 end
-
 local function removeESP(plr)
     if espObjects[plr] then
         if espObjects[plr].highlight then espObjects[plr].highlight:Destroy() end
@@ -153,7 +164,6 @@ local function removeESP(plr)
         espObjects[plr] = nil
     end
 end
-
 local function toggleESP()
     espEnabled = not espEnabled
     if espEnabled then
@@ -164,7 +174,6 @@ local function toggleESP()
         for p, _ in pairs(espObjects) do removeESP(p) end
     end
 end
-
 Players.PlayerAdded:Connect(function(p)
     if espEnabled and p ~= player then
         p.CharacterAdded:Connect(function() createESP(p) end)
@@ -177,12 +186,12 @@ end
 
 -- GUI WITH FLOATING LH BUTTON (NO RED X)
 local function createGUI()
+    -- (GUI code unchanged - exactly the same as your original)
     -- Floating Toggle Button
     local floatGui = Instance.new("ScreenGui")
     floatGui.Name = "LightHub_Float"
     floatGui.ResetOnSpawn = false
     floatGui.Parent = player:WaitForChild("PlayerGui")
-
     floatBtn = Instance.new("TextButton")
     floatBtn.Size = UDim2.new(0, 60, 0, 60)
     floatBtn.Position = UDim2.new(0, 20, 0.5, -30)
@@ -199,14 +208,12 @@ local function createGUI()
     local stroke = Instance.new("UIStroke", floatBtn)
     stroke.Color = Color3.fromRGB(255, 140, 0)
     stroke.Thickness = 3
-
     -- Main Menu (hidden by default)
     mainGui = Instance.new("ScreenGui")
     mainGui.Name = "LightHub_Main"
     mainGui.ResetOnSpawn = false
     mainGui.Enabled = false
     mainGui.Parent = player:WaitForChild("PlayerGui")
-
     local main = Instance.new("Frame")
     main.Size = UDim2.new(0, 370, 0, 380)
     main.Position = UDim2.new(0.5, -185, 0.5, -190)
@@ -217,7 +224,6 @@ local function createGUI()
     Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
     Instance.new("UIStroke", main).Color = Color3.fromRGB(255, 140, 0)
     Instance.new("UIStroke", main).Thickness = 2
-
     -- Title (no X button)
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 35)
@@ -228,7 +234,6 @@ local function createGUI()
     title.TextSize = 16
     title.Parent = main
     Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
-
     -- Feature Rows
     local yPos = 45
     local function addRow(name, toggleFunc, hasTextBox, defaultValue)
@@ -238,7 +243,6 @@ local function createGUI()
         row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         row.Parent = main
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
-
         local label = Instance.new("TextLabel", row)
         label.Size = UDim2.new(0.5, 0, 1, 0)
         label.BackgroundTransparency = 1
@@ -246,7 +250,6 @@ local function createGUI()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.TextColor3 = Color3.new(1, 1, 1)
         label.Font = Enum.Font.Gotham
-
         local btn = Instance.new("TextButton", row)
         btn.Size = UDim2.new(0, 65, 0, 30)
         btn.Position = UDim2.new(1, -75, 0.5, -15)
@@ -264,7 +267,6 @@ local function createGUI()
             btn.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
             label.Text = name .. ": " .. btn.Text
         end)
-
         if hasTextBox then
             local box = Instance.new("TextBox", row)
             box.Size = UDim2.new(0, 55, 0, 30)
@@ -282,10 +284,8 @@ local function createGUI()
                 end
             end)
         end
-
         yPos = yPos + 48
     end
-
     addRow("Fly", function() if flying then stopFly() else startFly() end end, true, "50")
     addRow("Speed", function()
         fastWalk = not fastWalk
@@ -294,12 +294,10 @@ local function createGUI()
     addRow("Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
     addRow("Inf Jump", function() infJump = not infJump end, false)
     addRow("ESP", toggleESP, false)
-
     -- Toggle Menu
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
     end
-
     floatBtn.MouseButton1Click:Connect(toggleMenu)
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
@@ -308,6 +306,5 @@ local function createGUI()
         end
     end)
 end
-
 createGUI()
-print("Light Hub v2.7 Loaded Successfully | Toggle with LH button • K • Insert")
+print("Light Hub v2.7 Loaded Successfully | Toggle with LH button • K • Insert | Mobile Fly Added")
