@@ -1,4 +1,4 @@
--- Light Hub v3.5 | ESP Refreshes Constantly (Every Frame) | Speed Works in Every Game
+-- Light Hub v3.7 | ESP Refresh FIXED (Every 5 Seconds - Full Rebuild)
 -- Press K / Insert or click LH to toggle menu
 
 local Players = game:GetService("Players")
@@ -9,7 +9,7 @@ local player = Players.LocalPlayer
 local flying = false
 local noclipping = false
 local infJump = false
-local espEnabled = false  -- Start OFF
+local espEnabled = false
 local fastWalk = false
 local flySpeed = 50
 local normalWS = 16
@@ -19,7 +19,6 @@ local floatBtn = nil
 local BV, BG, flyConn, noclipConn = nil, nil, nil, nil
 local speedConn = nil
 local espObjects = {}
-local espUpdateConn = nil
 
 local function getChar() return player.Character end
 local function getHumanoid() local c = getChar(); return c and c:FindFirstChild("Humanoid") end
@@ -123,7 +122,7 @@ UserInputService.InputBegan:Connect(function(i, gp)
     end
 end)
 
--- SPEED (works in every game)
+-- SPEED (unchanged)
 local function applySpeed()
     local hum = getHumanoid()
     local root = getRoot()
@@ -149,7 +148,7 @@ local function toggleSpeed()
     applySpeed()
 end
 
--- ESP - CONSTANT REFRESH (every frame when enabled)
+-- ESP - FULL REBUILD EVERY 5 SECONDS (FIXED)
 local function createESP(plr)
     if plr == player or espObjects[plr] then return end
     local char = plr.Character
@@ -187,15 +186,13 @@ local function createESP(plr)
     healthLabel.TextStrokeTransparency = 0
     healthLabel.Font = Enum.Font.GothamBold
     healthLabel.TextScaled = true
+    healthLabel.Text = math.floor(hum.Health) .. "/" .. hum.MaxHealth
 
-    -- Update health constantly
     hum.HealthChanged:Connect(function(health)
         if espObjects[plr] then
             healthLabel.Text = math.floor(health) .. "/" .. hum.MaxHealth
         end
     end)
-
-    healthLabel.Text = math.floor(hum.Health) .. "/" .. hum.MaxHealth
 
     espObjects[plr] = {highlight = hl, billboard = bill}
 end
@@ -208,17 +205,15 @@ local function removeESP(plr)
     end
 end
 
-local function updateESP()
+local function fullRefreshESP()
     if not espEnabled then return end
-    -- Remove invalid/old ESP
+    -- Destroy all old ESP
     for p, _ in pairs(espObjects) do
-        if not p.Character or not p.Character:FindFirstChild("Humanoid") then
-            removeESP(p)
-        end
+        removeESP(p)
     end
-    -- Add new players
+    -- Create new for all current players
     for _, p in Players:GetPlayers() do
-        if p ~= player and not espObjects[p] then
+        if p ~= player then
             createESP(p)
         end
     end
@@ -227,26 +222,26 @@ end
 local function toggleESP()
     espEnabled = not espEnabled
     if espEnabled then
-        updateESP()
-        if not espUpdateConn then
-            espUpdateConn = RunService.Heartbeat:Connect(updateESP)
-        end
+        fullRefreshESP()
     else
-        if espUpdateConn then
-            espUpdateConn:Disconnect()
-            espUpdateConn = nil
-        end
         for p, _ in pairs(espObjects) do removeESP(p) end
     end
 end
 
--- Handle new players
 Players.PlayerAdded:Connect(function(p)
     if espEnabled and p ~= player then
         p.CharacterAdded:Connect(function() createESP(p) end)
     end
 end)
 Players.PlayerRemoving:Connect(removeESP)
+
+-- Refresh every 5 seconds when enabled
+spawn(function()
+    while true do
+        wait(5)
+        fullRefreshESP()
+    end
+end)
 
 -- GUI (unchanged)
 local function createGUI()
@@ -294,7 +289,7 @@ local function createGUI()
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 35)
     title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    title.Text = "Light Hub v3.5 | ESP Constant Refresh"
+    title.Text = "Light Hub v3.7 | ESP Refresh FIXED"
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 16
@@ -377,4 +372,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v3.5 Loaded | ESP Refreshes CONSTANTLY (every frame)")
+print("Light Hub v3.7 Loaded | ESP Refresh FIXED Every 5 Seconds")
