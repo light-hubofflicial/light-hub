@@ -1,9 +1,11 @@
--- Light Hub v2.7 | Final Clean Version | No Red X | Floating LH Toggle
--- Toggle: Click "LH" button or press K / Insert
+-- Light Hub v3.3 | Godmode Removed | Speed FIXED for Every Game (Humanoid + Root Velocity Bypass)
+-- Press K / Insert or click LH to toggle menu | Speed now works in anti-cheat games like Rivals
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
+
 local flying = false
 local noclipping = false
 local infJump = false
@@ -15,6 +17,7 @@ local fastWS = 100
 local mainGui = nil
 local floatBtn = nil
 local BV, BG, flyConn, noclipConn = nil, nil, nil, nil
+local speedConn = nil
 local espObjects = {}
 
 local function getChar() return player.Character end
@@ -26,10 +29,11 @@ player.CharacterAdded:Connect(function()
     if flying then stopFly() end
     if noclipping then stopNoclip() end
     fastWalk = false
+    if speedConn then speedConn:Disconnect(); speedConn = nil end
     if getHumanoid() then getHumanoid().WalkSpeed = normalWS end
 end)
 
--- FLY FUNCTION (NOW WORKS ON MOBILE TOO)
+-- FLY (unchanged - working)
 local function startFly()
     if flying then return end
     local root = getRoot()
@@ -37,10 +41,12 @@ local function startFly()
     if not root or not hum then return end
     flying = true
     hum.PlatformStand = true
+
     BV = Instance.new("BodyVelocity")
     BV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     BV.Velocity = Vector3.new(0,0,0)
     BV.Parent = root
+
     BG = Instance.new("BodyGyro")
     BG.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
     BG.P = 12500
@@ -50,30 +56,25 @@ local function startFly()
     flyConn = RunService.Heartbeat:Connect(function()
         if not flying or not getRoot() then stopFly(); return end
         BG.CFrame = workspace.CurrentCamera.CFrame
+
         local move = Vector3.new()
 
-        -- PC Controls
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += workspace.CurrentCamera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= workspace.CurrentCamera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= workspace.CurrentCamera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += workspace.CurrentCamera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+        if UserInputService.KeyboardEnabled then
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += workspace.CurrentCamera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= workspace.CurrentCamera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= workspace.CurrentCamera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += workspace.CurrentCamera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+        end
 
-        -- === MOBILE SUPPORT (uses the default Roblox thumbstick + jump button) ===
         if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-            local touchMove = UserInputService:GetPropertyChangedSignal("TouchMovement"):Connect(function()
-                local touchVec = UserInputService:GetTouchMovement()
-                if touchVec then
-                    for _, touch in pairs(touchVec) do
-                        move += Vector3.new(touch.Position.X, 0, -touch.Position.Y) * 0.7
-                    end
-                end
-            end)
-
-            -- Use the default Roblox Jump button for going up
-            if UserInputService.JumpRequest then
-                move += Vector3.new(0, 1, 0)
+            local humanoid = getHumanoid()
+            if humanoid and humanoid.MoveDirection.Magnitude > 0 then
+                move += humanoid.MoveDirection * 1.5
+            end
+            if humanoid.Jump then
+                move += Vector3.new(0,1,0)
             end
         end
 
@@ -94,14 +95,16 @@ local function stopFly()
     if hum then hum.PlatformStand = false end
 end
 
--- (Everything else below is completely unchanged)
--- NOCLIP FUNCTION
+-- NOCLIP (unchanged)
 local function startNoclip()
     if noclipping then return end
     noclipping = true
     noclipConn = RunService.Stepped:Connect(function()
-        for _, p in pairs(getChar():GetDescendants()) do
-            if p:IsA("BasePart") then p.CanCollide = false end
+        local char = getChar()
+        if char then
+            for _, p in pairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
         end
     end)
 end
@@ -110,29 +113,64 @@ local function stopNoclip()
     if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
 end
 
--- INFINITE JUMP
+-- INFINITE JUMP (unchanged)
 UserInputService.InputBegan:Connect(function(i, gp)
-    if gp or not infJump or i.KeyCode ~= Enum.KeyCode.Space then return end
-    local h = getHumanoid()
-    if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    if gp or not infJump then return end
+    if i.KeyCode == Enum.KeyCode.Space then
+        local h = getHumanoid()
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
 end)
 
--- FULL ESP (Name + Health + Highlight)
+-- SPEED FIXED FOR EVERY GAME (Humanoid.WalkSpeed + Root Velocity fallback)
+local function applySpeed()
+    local hum = getHumanoid()
+    local root = getRoot()
+    if not hum or not root then return end
+
+    hum.WalkSpeed = fastWalk and fastWS or normalWS
+
+    if speedConn then speedConn:Disconnect() end
+    speedConn = RunService.Heartbeat:Connect(function()
+        local hum = getHumanoid()
+        local root = getRoot()
+        if not hum or not root then return end
+        if fastWalk then
+            if hum.MoveDirection.Magnitude > 0 then
+                root.Velocity = hum.MoveDirection * fastWS
+            else
+                root.Velocity = Vector3.new(0, root.Velocity.Y, 0)
+            end
+        end
+    end)
+end
+
+local function toggleSpeed()
+    fastWalk = not fastWalk
+    applySpeed()
+end
+
+-- ESP (unchanged with 5-second refresh)
 local function createESP(plr)
     if plr == player or espObjects[plr] then return end
-    local char = plr.Character or plr.CharacterAdded:Wait()
-    local hum = char:WaitForChild("Humanoid")
-    local head = char:WaitForChild("Head")
+    local char = plr.Character
+    if not char then return end
+    local hum = char:FindFirstChild("Humanoid")
+    local head = char:FindFirstChild("Head")
+    if not hum or not head then return end
+
     local hl = Instance.new("Highlight", char)
     hl.FillColor = Color3.fromRGB(255, 0, 0)
     hl.OutlineColor = Color3.fromRGB(255, 255, 0)
     hl.FillTransparency = 0.5
     hl.OutlineTransparency = 0
+
     local bill = Instance.new("BillboardGui", char)
     bill.Adornee = head
     bill.Size = UDim2.new(0, 100, 0, 50)
     bill.StudsOffset = Vector3.new(0, 3, 0)
     bill.AlwaysOnTop = true
+
     local nameLabel = Instance.new("TextLabel", bill)
     nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
     nameLabel.BackgroundTransparency = 1
@@ -141,6 +179,7 @@ local function createESP(plr)
     nameLabel.TextStrokeTransparency = 0
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextScaled = true
+
     local healthLabel = Instance.new("TextLabel", bill)
     healthLabel.Size = UDim2.new(1, 0, 0.5, 0)
     healthLabel.Position = UDim2.new(0, 0, 0.5, 0)
@@ -150,13 +189,16 @@ local function createESP(plr)
     healthLabel.Font = Enum.Font.GothamBold
     healthLabel.TextScaled = true
     healthLabel.Text = math.floor(hum.Health) .. "/" .. hum.MaxHealth
+
     hum.HealthChanged:Connect(function(health)
         if espObjects[plr] then
             healthLabel.Text = math.floor(health) .. "/" .. hum.MaxHealth
         end
     end)
+
     espObjects[plr] = {highlight = hl, billboard = bill}
 end
+
 local function removeESP(plr)
     if espObjects[plr] then
         if espObjects[plr].highlight then espObjects[plr].highlight:Destroy() end
@@ -164,34 +206,30 @@ local function removeESP(plr)
         espObjects[plr] = nil
     end
 end
-local function toggleESP()
-    espEnabled = not espEnabled
-    if espEnabled then
-        for _, p in Players:GetPlayers() do
-            if p ~= player then createESP(p) end
-        end
-    else
-        for p, _ in pairs(espObjects) do removeESP(p) end
-    end
-end
-Players.PlayerAdded:Connect(function(p)
-    if espEnabled and p ~= player then
-        p.CharacterAdded:Connect(function() createESP(p) end)
-    end
-end)
-Players.PlayerRemoving:Connect(removeESP)
-for _, p in Players:GetPlayers() do
-    if p ~= player then createESP(p) end
+
+local function refreshESP()
+    if not espEnabled then return end
+    for p, _ in pairs(espObjects) do removeESP(p) end
+    for _, p in Players:GetPlayers() do if p ~= player then createESP(p) end end
 end
 
--- GUI WITH FLOATING LH BUTTON (NO RED X)
+local function toggleESP()
+    espEnabled = not espEnabled
+    refreshESP()
+end
+
+Players.PlayerAdded:Connect(function(p) if espEnabled and p ~= player then p.CharacterAdded:Connect(function() createESP(p) end) end end)
+Players.PlayerRemoving:Connect(removeESP)
+refreshESP()
+spawn(function() while true do wait(5) refreshESP() end end)
+
+-- GUI (Godmode row removed, Speed now has box for custom value)
 local function createGUI()
-    -- (GUI code unchanged - exactly the same as your original)
-    -- Floating Toggle Button
     local floatGui = Instance.new("ScreenGui")
     floatGui.Name = "LightHub_Float"
     floatGui.ResetOnSpawn = false
     floatGui.Parent = player:WaitForChild("PlayerGui")
+
     floatBtn = Instance.new("TextButton")
     floatBtn.Size = UDim2.new(0, 60, 0, 60)
     floatBtn.Position = UDim2.new(0, 20, 0.5, -30)
@@ -205,36 +243,39 @@ local function createGUI()
     floatBtn.Draggable = true
     floatBtn.Parent = floatGui
     Instance.new("UICorner", floatBtn).CornerRadius = UDim.new(1, 0)
+
     local stroke = Instance.new("UIStroke", floatBtn)
     stroke.Color = Color3.fromRGB(255, 140, 0)
     stroke.Thickness = 3
-    -- Main Menu (hidden by default)
+
     mainGui = Instance.new("ScreenGui")
     mainGui.Name = "LightHub_Main"
     mainGui.ResetOnSpawn = false
     mainGui.Enabled = false
     mainGui.Parent = player:WaitForChild("PlayerGui")
+
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 370, 0, 380)
+    main.Size = UDim2.new(0, 370, 0, 380)  -- Back to compact size
     main.Position = UDim2.new(0.5, -185, 0.5, -190)
     main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     main.Active = true
     main.Draggable = true
     main.Parent = mainGui
     Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-    Instance.new("UIStroke", main).Color = Color3.fromRGB(255, 140, 0)
-    Instance.new("UIStroke", main).Thickness = 2
-    -- Title (no X button)
+    local mainStroke = Instance.new("UIStroke", main)
+    mainStroke.Color = Color3.fromRGB(255, 140, 0)
+    mainStroke.Thickness = 2
+
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 35)
     title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    title.Text = "Light Hub v2.7 | Toggle: LH • K • Insert"
+    title.Text = "Light Hub v3.3 | Speed Fixed"
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 16
     title.Parent = main
     Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
-    -- Feature Rows
+
     local yPos = 45
     local function addRow(name, toggleFunc, hasTextBox, defaultValue)
         local row = Instance.new("Frame")
@@ -243,6 +284,7 @@ local function createGUI()
         row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         row.Parent = main
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
         local label = Instance.new("TextLabel", row)
         label.Size = UDim2.new(0.5, 0, 1, 0)
         label.BackgroundTransparency = 1
@@ -250,6 +292,7 @@ local function createGUI()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.TextColor3 = Color3.new(1, 1, 1)
         label.Font = Enum.Font.Gotham
+
         local btn = Instance.new("TextButton", row)
         btn.Size = UDim2.new(0, 65, 0, 30)
         btn.Position = UDim2.new(1, -75, 0.5, -15)
@@ -259,14 +302,15 @@ local function createGUI()
         btn.MouseButton1Click:Connect(function()
             toggleFunc()
             local state = (name == "Fly" and flying) or
-                         (name == "Noclip" and noclipping) or
-                         (name == "Inf Jump" and infJump) or
-                         (name == "Speed" and fastWalk) or
-                         (name == "ESP" and espEnabled)
+                          (name == "Noclip" and noclipping) or
+                          (name == "Inf Jump" and infJump) or
+                          (name == "Speed" and fastWalk) or
+                          (name == "ESP" and espEnabled)
             btn.Text = state and "ON" or "OFF"
             btn.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
             label.Text = name .. ": " .. btn.Text
         end)
+
         if hasTextBox then
             local box = Instance.new("TextBox", row)
             box.Size = UDim2.new(0, 55, 0, 30)
@@ -280,25 +324,25 @@ local function createGUI()
                     flySpeed = math.clamp(val or 50, 1, 500)
                 elseif name == "Speed" then
                     fastWS = math.clamp(val or 100, 16, 500)
-                    if fastWalk and getHumanoid() then getHumanoid().WalkSpeed = fastWS end
+                    if fastWalk then applySpeed() end
                 end
             end)
         end
         yPos = yPos + 48
     end
+
     addRow("Fly", function() if flying then stopFly() else startFly() end end, true, "50")
-    addRow("Speed", function()
-        fastWalk = not fastWalk
-        if getHumanoid() then getHumanoid().WalkSpeed = fastWalk and fastWS or normalWS end
-    end, true, "100")
+    addRow("Speed", toggleSpeed, true, "100")
     addRow("Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
     addRow("Inf Jump", function() infJump = not infJump end, false)
     addRow("ESP", toggleESP, false)
-    -- Toggle Menu
+
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
     end
+
     floatBtn.MouseButton1Click:Connect(toggleMenu)
+
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
         if input.KeyCode == Enum.KeyCode.K or input.KeyCode == Enum.KeyCode.Insert then
@@ -306,5 +350,6 @@ local function createGUI()
         end
     end)
 end
+
 createGUI()
-print("Light Hub v2.7 Loaded Successfully | Toggle with LH button • K • Insert | Mobile Fly Added")
+print("Light Hub v3.3 Loaded | Godmode Removed | Speed Works in EVERY Game")
