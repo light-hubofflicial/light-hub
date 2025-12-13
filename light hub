@@ -1,4 +1,4 @@
--- Light Hub v2 | Fun Tab & Fling Removed | Left Tabs
+-- Light Hub v2 | Fun Tab & Fling Removed | Left Tabs | FOV Persistent & Max 200 --
 -- Press K / Insert or click LH to toggle menu
 
 local Players = game:GetService("Players")
@@ -13,11 +13,12 @@ local infJump = false
 local espEnabled = false
 local fastWalk = false
 local fullbright = false
+local fovEnabled = false
+
 local flySpeed = 50
 local normalWS = 16
 local fastWS = 100
-local mainGui = nil
-local floatBtn = nil
+
 local BV, BG, flyConn, noclipConn = nil, nil, nil, nil
 local speedConn = nil
 local espObjects = {}
@@ -27,6 +28,12 @@ local savedClockTime = Lighting.ClockTime
 local savedFogEnd = Lighting.FogEnd
 local savedGlobalShadows = Lighting.GlobalShadows
 local savedAmbient = Lighting.Ambient
+
+-- FOV variables
+local originalFOV = workspace.CurrentCamera.FieldOfView
+local currentFOV = originalFOV
+local minFOV = 30
+local maxFOV = 200
 
 local function getChar() return player.Character end
 local function getHumanoid() local c = getChar(); return c and c:FindFirstChild("Humanoid") end
@@ -39,9 +46,26 @@ player.CharacterAdded:Connect(function()
     fastWalk = false
     if speedConn then speedConn:Disconnect(); speedConn = nil end
     if getHumanoid() then getHumanoid().WalkSpeed = normalWS end
+
+    if fovEnabled then
+        workspace.CurrentCamera.FieldOfView = currentFOV
+    end
 end)
 
--- FLY (unchanged)
+-- Make FOV persistent (doesn't reset when opening menus, shops, etc.)
+RunService.RenderStepped:Connect(function()
+    if fovEnabled and workspace.CurrentCamera then
+        workspace.CurrentCamera.FieldOfView = currentFOV
+    end
+end)
+
+workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+    if fovEnabled then
+        workspace.CurrentCamera.FieldOfView = currentFOV
+    end
+end)
+
+-- FLY
 local function startFly()
     if flying then return end
     local root = getRoot()
@@ -49,24 +73,19 @@ local function startFly()
     if not root or not hum then return end
     flying = true
     hum.PlatformStand = true
-
     BV = Instance.new("BodyVelocity")
     BV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     BV.Velocity = Vector3.new(0,0,0)
     BV.Parent = root
-
     BG = Instance.new("BodyGyro")
     BG.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
     BG.P = 12500
     BG.D = 500
     BG.Parent = root
-
     flyConn = RunService.Heartbeat:Connect(function()
         if not flying or not getRoot() then stopFly(); return end
         BG.CFrame = workspace.CurrentCamera.CFrame
-
         local move = Vector3.new()
-
         if UserInputService.KeyboardEnabled then
             if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += workspace.CurrentCamera.CFrame.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= workspace.CurrentCamera.CFrame.LookVector end
@@ -75,17 +94,6 @@ local function startFly()
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
         end
-
-        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-            local humanoid = getHumanoid()
-            if humanoid and humanoid.MoveDirection.Magnitude > 0 then
-                move += humanoid.MoveDirection * 1.5
-            end
-            if humanoid.Jump then
-                move += Vector3.new(0,1,0)
-            end
-        end
-
         if move.Magnitude > 0 then
             BV.Velocity = move.Unit * flySpeed
         else
@@ -103,7 +111,7 @@ local function stopFly()
     if hum then hum.PlatformStand = false end
 end
 
--- NOCLIP (unchanged)
+-- NOCLIP
 local function startNoclip()
     if noclipping then return end
     noclipping = true
@@ -116,12 +124,13 @@ local function startNoclip()
         end
     end)
 end
+
 local function stopNoclip()
     noclipping = false
     if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
 end
 
--- INFINITE JUMP (unchanged)
+-- INFINITE JUMP
 UserInputService.InputBegan:Connect(function(i, gp)
     if gp or not infJump then return end
     if i.KeyCode == Enum.KeyCode.Space then
@@ -130,23 +139,16 @@ UserInputService.InputBegan:Connect(function(i, gp)
     end
 end)
 
--- SPEED (unchanged)
+-- SPEED
 local function applySpeed()
     local hum = getHumanoid()
     local root = getRoot()
     if not hum or not root then return end
-
     hum.WalkSpeed = fastWalk and fastWS or normalWS
-
     if speedConn then speedConn:Disconnect() end
     speedConn = RunService.Heartbeat:Connect(function()
-        local hum = getHumanoid()
-        local root = getRoot()
-        if not hum or not root then return end
-        if fastWalk then
-            if hum.MoveDirection.Magnitude > 0 then
-                root.Velocity = hum.MoveDirection * fastWS + Vector3.new(0, root.Velocity.Y, 0)
-            end
+        if fastWalk and hum.MoveDirection.Magnitude > 0 then
+            root.Velocity = hum.MoveDirection * fastWS + Vector3.new(0, root.Velocity.Y, 0)
         end
     end)
 end
@@ -156,7 +158,7 @@ local function toggleSpeed()
     applySpeed()
 end
 
--- FULLBRIGHT TOGGLE
+-- FULLBRIGHT
 local function startFullbright()
     if fullbright then return end
     fullbright = true
@@ -165,7 +167,6 @@ local function startFullbright()
     savedFogEnd = Lighting.FogEnd
     savedGlobalShadows = Lighting.GlobalShadows
     savedAmbient = Lighting.Ambient
-
     Lighting.Brightness = 3
     Lighting.ClockTime = 12
     Lighting.FogEnd = 100000
@@ -182,7 +183,7 @@ local function stopFullbright()
     Lighting.Ambient = savedAmbient
 end
 
--- ESP - FULL REBUILD EVERY 5 SECONDS (FIXED)
+-- ESP
 local function createESP(plr)
     if plr == player or espObjects[plr] then return end
     local char = plr.Character
@@ -190,19 +191,16 @@ local function createESP(plr)
     local hum = char:FindFirstChild("Humanoid")
     local head = char:FindFirstChild("Head")
     if not hum or not head then return end
-
     local hl = Instance.new("Highlight", char)
     hl.FillColor = Color3.fromRGB(255, 0, 0)
     hl.OutlineColor = Color3.fromRGB(255, 255, 0)
     hl.FillTransparency = 0.5
     hl.OutlineTransparency = 0
-
     local bill = Instance.new("BillboardGui", char)
     bill.Adornee = head
     bill.Size = UDim2.new(0, 100, 0, 50)
     bill.StudsOffset = Vector3.new(0, 3, 0)
     bill.AlwaysOnTop = true
-
     local nameLabel = Instance.new("TextLabel", bill)
     nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
     nameLabel.BackgroundTransparency = 1
@@ -211,7 +209,6 @@ local function createESP(plr)
     nameLabel.TextStrokeTransparency = 0
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextScaled = true
-
     local healthLabel = Instance.new("TextLabel", bill)
     healthLabel.Size = UDim2.new(1, 0, 0.5, 0)
     healthLabel.Position = UDim2.new(0, 0, 0.5, 0)
@@ -221,13 +218,11 @@ local function createESP(plr)
     healthLabel.Font = Enum.Font.GothamBold
     healthLabel.TextScaled = true
     healthLabel.Text = math.floor(hum.Health) .. "/" .. hum.MaxHealth
-
     hum.HealthChanged:Connect(function(health)
         if espObjects[plr] then
             healthLabel.Text = math.floor(health) .. "/" .. hum.MaxHealth
         end
     end)
-
     espObjects[plr] = {highlight = hl, billboard = bill}
 end
 
@@ -241,25 +236,16 @@ end
 
 local function fullRefreshESP()
     if not espEnabled then return end
-    for p, _ in pairs(espObjects) do
-        removeESP(p)
-    end
+    for p, _ in pairs(espObjects) do removeESP(p) end
     espObjects = {}
     for _, p in Players:GetPlayers() do
-        if p ~= player then
-            createESP(p)
-        end
+        if p ~= player then createESP(p) end
     end
 end
 
 local function toggleESP()
     espEnabled = not espEnabled
-    if espEnabled then
-        fullRefreshESP()
-    else
-        for p, _ in pairs(espObjects) do removeESP(p) end
-        espObjects = {}
-    end
+    if espEnabled then fullRefreshESP() else for p, _ in pairs(espObjects) do removeESP(p) end espObjects = {} end
 end
 
 Players.PlayerAdded:Connect(function(p)
@@ -270,19 +256,17 @@ end)
 Players.PlayerRemoving:Connect(removeESP)
 
 task.spawn(function()
-    while task.wait(5) do
-        fullRefreshESP()
-    end
+    while task.wait(5) do fullRefreshESP() end
 end)
 
--- GUI WITH LEFT TABS (Movement & Visuals only)
+-- GUI
 local function createGUI()
     local floatGui = Instance.new("ScreenGui")
     floatGui.Name = "LightHub_Float"
     floatGui.ResetOnSpawn = false
     floatGui.Parent = player:WaitForChild("PlayerGui")
 
-    floatBtn = Instance.new("TextButton")
+    local floatBtn = Instance.new("TextButton")
     floatBtn.Size = UDim2.new(0, 60, 0, 60)
     floatBtn.Position = UDim2.new(0, 20, 0.5, -30)
     floatBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -295,12 +279,11 @@ local function createGUI()
     floatBtn.Draggable = true
     floatBtn.Parent = floatGui
     Instance.new("UICorner", floatBtn).CornerRadius = UDim.new(1, 0)
-
     local stroke = Instance.new("UIStroke", floatBtn)
     stroke.Color = Color3.fromRGB(255, 140, 0)
     stroke.Thickness = 3
 
-    mainGui = Instance.new("ScreenGui")
+    local mainGui = Instance.new("ScreenGui")
     mainGui.Name = "LightHub_Main"
     mainGui.ResetOnSpawn = false
     mainGui.Enabled = false
@@ -328,7 +311,6 @@ local function createGUI()
     title.Parent = main
     Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
-    -- Left Tab Panel (2 tabs)
     local tabPanel = Instance.new("Frame")
     tabPanel.Size = UDim2.new(0, 120, 1, -35)
     tabPanel.Position = UDim2.new(0, 0, 0, 35)
@@ -356,7 +338,6 @@ local function createGUI()
     visualsTab.Parent = tabPanel
     Instance.new("UICorner", visualsTab).CornerRadius = UDim.new(0, 8)
 
-    -- Content Area
     local contentArea = Instance.new("Frame")
     contentArea.Size = UDim2.new(1, -120, 1, -35)
     contentArea.Position = UDim2.new(0, 120, 0, 35)
@@ -366,16 +347,15 @@ local function createGUI()
     local movementContent = Instance.new("Frame")
     movementContent.Size = UDim2.new(1, 0, 1, 0)
     movementContent.BackgroundTransparency = 1
-    movementContent.Parent = contentArea
     movementContent.Visible = true
+    movementContent.Parent = contentArea
 
     local visualsContent = Instance.new("Frame")
     visualsContent.Size = UDim2.new(1, 0, 1, 0)
     visualsContent.BackgroundTransparency = 1
-    visualsContent.Parent = contentArea
     visualsContent.Visible = false
+    visualsContent.Parent = contentArea
 
-    -- Tab switching
     movementTab.MouseButton1Click:Connect(function()
         movementContent.Visible = true
         visualsContent.Visible = false
@@ -394,7 +374,6 @@ local function createGUI()
         visualsTab.TextColor3 = Color3.new(0, 0, 0)
     end)
 
-    -- Add rows function
     local function addRow(parent, name, toggleFunc, hasTextBox, defaultValue)
         local rowCount = #parent:GetChildren()
         local yPos = rowCount * 48 + 10
@@ -406,7 +385,7 @@ local function createGUI()
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
         local label = Instance.new("TextLabel", row)
-        label.Size = UDim2.new(0.5, 0, 1, 0)
+        label.Size = UDim2.new(0.35, 0, 1, 0)
         label.BackgroundTransparency = 1
         label.Text = name .. ": OFF"
         label.TextXAlignment = Enum.TextXAlignment.Left
@@ -421,14 +400,10 @@ local function createGUI()
         btn.Text = "OFF"
         btn.TextSize = 18
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
         btn.MouseButton1Click:Connect(function()
             toggleFunc()
-            local state = (name == "Fly" and flying) or
-                          (name == "Speed" and fastWalk) or
-                          (name == "Noclip" and noclipping) or
-                          (name == "Inf Jump" and infJump) or
-                          (name == "ESP" and espEnabled) or
-                          (name == "Fullbright" and fullbright)
+            local state = (name == "Fly" and flying) or (name == "Speed" and fastWalk) or (name == "Noclip" and noclipping) or (name == "Inf Jump" and infJump) or (name == "ESP" and espEnabled) or (name == "Fullbright" and fullbright) or (name == "FOV" and fovEnabled)
             btn.Text = state and "ON" or "OFF"
             btn.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
             label.Text = name .. ": " .. btn.Text
@@ -454,22 +429,75 @@ local function createGUI()
         end
     end
 
-    -- Movement Tab
+    local function addFOVRow(parent)
+        local rowCount = #parent:GetChildren()
+        local yPos = rowCount * 48 + 10
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, -20, 0, 40)
+        row.Position = UDim2.new(0, 10, 0, yPos)
+        row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        row.Parent = parent
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+        local label = Instance.new("TextLabel", row)
+        label.Size = UDim2.new(0.35, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "FOV: OFF"
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 18
+
+        local fovBox = Instance.new("TextBox", row)
+        fovBox.Size = UDim2.new(0, 70, 0, 30)
+        fovBox.Position = UDim2.new(1, -145, 0.5, -15)
+        fovBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        fovBox.Text = tostring(math.floor(currentFOV))
+        fovBox.TextColor3 = Color3.new(1,1,1)
+        fovBox.TextSize = 18
+        fovBox.ClearTextOnFocus = false
+        Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 6)
+
+        local toggleBtn = Instance.new("TextButton", row)
+        toggleBtn.Size = UDim2.new(0, 65, 0, 30)
+        toggleBtn.Position = UDim2.new(1, -75, 0.5, -15)
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        toggleBtn.Text = "OFF"
+        toggleBtn.TextSize = 18
+        Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+        fovBox.FocusLost:Connect(function()
+            local val = tonumber(fovBox.Text)
+            if val then
+                currentFOV = math.clamp(math.floor(val), minFOV, maxFOV)
+                fovBox.Text = tostring(currentFOV)
+            else
+                fovBox.Text = tostring(currentFOV)
+            end
+        end)
+
+        toggleBtn.MouseButton1Click:Connect(function()
+            fovEnabled = not fovEnabled
+            toggleBtn.Text = fovEnabled and "ON" or "OFF"
+            toggleBtn.BackgroundColor3 = fovEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
+            label.Text = "FOV: " .. toggleBtn.Text
+        end)
+    end
+
     addRow(movementContent, "Fly", function() if flying then stopFly() else startFly() end end, true, "50")
     addRow(movementContent, "Speed", toggleSpeed, true, "100")
     addRow(movementContent, "Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
     addRow(movementContent, "Inf Jump", function() infJump = not infJump end, false)
 
-    -- Visuals Tab
     addRow(visualsContent, "ESP", toggleESP, false)
     addRow(visualsContent, "Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
+    addFOVRow(visualsContent)
 
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
     end
 
     floatBtn.MouseButton1Click:Connect(toggleMenu)
-
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
         if input.KeyCode == Enum.KeyCode.K or input.KeyCode == Enum.KeyCode.Insert then
@@ -479,4 +507,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v2 Loaded | Fun Tab & Fling Removed")
+print("Light Hub v2 Loaded | All Features + Persistent FOV (Max 200)")
