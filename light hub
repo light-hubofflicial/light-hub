@@ -1,4 +1,4 @@
--- Light Hub v2 | ESP + Fullbright + Fly + Speed + Noclip + Inf Jump
+-- Light Hub v2 | Fun Tab & Fling Removed | Left Tabs
 -- Press K / Insert or click LH to toggle menu
 
 local Players = game:GetService("Players")
@@ -275,7 +275,7 @@ task.spawn(function()
     end
 end)
 
--- GUI WITH LEFT TABS + BIGGER TEXT
+-- GUI WITH LEFT TABS (Movement & Visuals only)
 local function createGUI()
     local floatGui = Instance.new("ScreenGui")
     floatGui.Name = "LightHub_Float"
@@ -328,7 +328,7 @@ local function createGUI()
     title.Parent = main
     Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
-    -- Left Tab Panel
+    -- Left Tab Panel (2 tabs)
     local tabPanel = Instance.new("Frame")
     tabPanel.Size = UDim2.new(0, 120, 1, -35)
     tabPanel.Position = UDim2.new(0, 0, 0, 35)
@@ -337,9 +337,9 @@ local function createGUI()
 
     local movementTab = Instance.new("TextButton")
     movementTab.Size = UDim2.new(1, 0, 0, 50)
-    movementTab.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    movementTab.BackgroundColor3 = Color3.new(1, 1, 1)
     movementTab.Text = "Movement"
-    movementTab.TextColor3 = Color3.new(1, 1, 1)
+    movementTab.TextColor3 = Color3.new(0, 0, 0)
     movementTab.Font = Enum.Font.GothamBold
     movementTab.TextSize = 18
     movementTab.Parent = tabPanel
@@ -348,7 +348,7 @@ local function createGUI()
     local visualsTab = Instance.new("TextButton")
     visualsTab.Size = UDim2.new(1, 0, 0, 50)
     visualsTab.Position = UDim2.new(0, 0, 0, 50)
-    visualsTab.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    visualsTab.BackgroundColor3 = Color3.new(0, 0, 0)
     visualsTab.Text = "Visuals"
     visualsTab.TextColor3 = Color3.new(1, 1, 1)
     visualsTab.Font = Enum.Font.GothamBold
@@ -379,15 +379,19 @@ local function createGUI()
     movementTab.MouseButton1Click:Connect(function()
         movementContent.Visible = true
         visualsContent.Visible = false
-        movementTab.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        visualsTab.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        movementTab.BackgroundColor3 = Color3.new(1, 1, 1)
+        movementTab.TextColor3 = Color3.new(0, 0, 0)
+        visualsTab.BackgroundColor3 = Color3.new(0, 0, 0)
+        visualsTab.TextColor3 = Color3.new(1, 1, 1)
     end)
 
     visualsTab.MouseButton1Click:Connect(function()
         movementContent.Visible = false
         visualsContent.Visible = true
-        movementTab.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        visualsTab.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        movementTab.BackgroundColor3 = Color3.new(0, 0, 0)
+        movementTab.TextColor3 = Color3.new(1, 1, 1)
+        visualsTab.BackgroundColor3 = Color3.new(1, 1, 1)
+        visualsTab.TextColor3 = Color3.new(0, 0, 0)
     end)
 
     -- Add rows function
@@ -475,4 +479,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v2 Loaded")
+print("Light Hub v2 Loaded | Fun Tab & Fling Removed")
