@@ -1,4 +1,4 @@
--- Light Hub v3.10 | Fullbright Toggle Added | ESP Refresh Every 5 Seconds
+-- Light Hub v2 | ESP + Fullbright + Fly + Speed + Noclip + Inf Jump
 -- Press K / Insert or click LH to toggle menu
 
 local Players = game:GetService("Players")
@@ -275,7 +275,7 @@ task.spawn(function()
     end
 end)
 
--- GUI WITH FULLBRIGHT ROW
+-- GUI WITH LEFT TABS + BIGGER TEXT
 local function createGUI()
     local floatGui = Instance.new("ScreenGui")
     floatGui.Name = "LightHub_Float"
@@ -307,8 +307,8 @@ local function createGUI()
     mainGui.Parent = player:WaitForChild("PlayerGui")
 
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 370, 0, 428) -- Extra space for new row
-    main.Position = UDim2.new(0.5, -185, 0.5, -214)
+    main.Size = UDim2.new(0, 450, 0, 380)
+    main.Position = UDim2.new(0.5, -225, 0.5, -190)
     main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     main.Active = true
     main.Draggable = true
@@ -321,20 +321,84 @@ local function createGUI()
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 35)
     title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    title.Text = "Light Hub v3.10 | Fullbright Added"
+    title.Text = "Light Hub v2"
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
+    title.TextSize = 20
     title.Parent = main
     Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
-    local yPos = 45
-    local function addRow(name, toggleFunc, hasTextBox, defaultValue)
+    -- Left Tab Panel
+    local tabPanel = Instance.new("Frame")
+    tabPanel.Size = UDim2.new(0, 120, 1, -35)
+    tabPanel.Position = UDim2.new(0, 0, 0, 35)
+    tabPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    tabPanel.Parent = main
+
+    local movementTab = Instance.new("TextButton")
+    movementTab.Size = UDim2.new(1, 0, 0, 50)
+    movementTab.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    movementTab.Text = "Movement"
+    movementTab.TextColor3 = Color3.new(1, 1, 1)
+    movementTab.Font = Enum.Font.GothamBold
+    movementTab.TextSize = 18
+    movementTab.Parent = tabPanel
+    Instance.new("UICorner", movementTab).CornerRadius = UDim.new(0, 8)
+
+    local visualsTab = Instance.new("TextButton")
+    visualsTab.Size = UDim2.new(1, 0, 0, 50)
+    visualsTab.Position = UDim2.new(0, 0, 0, 50)
+    visualsTab.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    visualsTab.Text = "Visuals"
+    visualsTab.TextColor3 = Color3.new(1, 1, 1)
+    visualsTab.Font = Enum.Font.GothamBold
+    visualsTab.TextSize = 18
+    visualsTab.Parent = tabPanel
+    Instance.new("UICorner", visualsTab).CornerRadius = UDim.new(0, 8)
+
+    -- Content Area
+    local contentArea = Instance.new("Frame")
+    contentArea.Size = UDim2.new(1, -120, 1, -35)
+    contentArea.Position = UDim2.new(0, 120, 0, 35)
+    contentArea.BackgroundTransparency = 1
+    contentArea.Parent = main
+
+    local movementContent = Instance.new("Frame")
+    movementContent.Size = UDim2.new(1, 0, 1, 0)
+    movementContent.BackgroundTransparency = 1
+    movementContent.Parent = contentArea
+    movementContent.Visible = true
+
+    local visualsContent = Instance.new("Frame")
+    visualsContent.Size = UDim2.new(1, 0, 1, 0)
+    visualsContent.BackgroundTransparency = 1
+    visualsContent.Parent = contentArea
+    visualsContent.Visible = false
+
+    -- Tab switching
+    movementTab.MouseButton1Click:Connect(function()
+        movementContent.Visible = true
+        visualsContent.Visible = false
+        movementTab.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        visualsTab.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end)
+
+    visualsTab.MouseButton1Click:Connect(function()
+        movementContent.Visible = false
+        visualsContent.Visible = true
+        movementTab.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        visualsTab.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end)
+
+    -- Add rows function
+    local function addRow(parent, name, toggleFunc, hasTextBox, defaultValue)
+        local rowCount = #parent:GetChildren()
+        local yPos = rowCount * 48 + 10
         local row = Instance.new("Frame")
         row.Size = UDim2.new(1, -20, 0, 40)
         row.Position = UDim2.new(0, 10, 0, yPos)
         row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        row.Parent = main
+        row.Parent = parent
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
         local label = Instance.new("TextLabel", row)
@@ -343,20 +407,22 @@ local function createGUI()
         label.Text = name .. ": OFF"
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.TextColor3 = Color3.new(1, 1, 1)
-        label.Font = Enum.Font.Gotham
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 18
 
         local btn = Instance.new("TextButton", row)
         btn.Size = UDim2.new(0, 65, 0, 30)
         btn.Position = UDim2.new(1, -75, 0.5, -15)
         btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         btn.Text = "OFF"
+        btn.TextSize = 18
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
         btn.MouseButton1Click:Connect(function()
             toggleFunc()
             local state = (name == "Fly" and flying) or
+                          (name == "Speed" and fastWalk) or
                           (name == "Noclip" and noclipping) or
                           (name == "Inf Jump" and infJump) or
-                          (name == "Speed" and fastWalk) or
                           (name == "ESP" and espEnabled) or
                           (name == "Fullbright" and fullbright)
             btn.Text = state and "ON" or "OFF"
@@ -370,6 +436,7 @@ local function createGUI()
             box.Position = UDim2.new(1, -135, 0.5, -15)
             box.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             box.Text = defaultValue
+            box.TextSize = 18
             Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
             box.FocusLost:Connect(function()
                 local val = tonumber(box.Text)
@@ -381,15 +448,17 @@ local function createGUI()
                 end
             end)
         end
-        yPos = yPos + 48
     end
 
-    addRow("Fly", function() if flying then stopFly() else startFly() end end, true, "50")
-    addRow("Speed", toggleSpeed, true, "100")
-    addRow("Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
-    addRow("Inf Jump", function() infJump = not infJump end, false)
-    addRow("ESP", toggleESP, false)
-    addRow("Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
+    -- Movement Tab
+    addRow(movementContent, "Fly", function() if flying then stopFly() else startFly() end end, true, "50")
+    addRow(movementContent, "Speed", toggleSpeed, true, "100")
+    addRow(movementContent, "Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
+    addRow(movementContent, "Inf Jump", function() infJump = not infJump end, false)
+
+    -- Visuals Tab
+    addRow(visualsContent, "ESP", toggleESP, false)
+    addRow(visualsContent, "Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
 
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
@@ -406,4 +475,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v3.10 Loaded | Fullbright Toggle Added")
+print("Light Hub v2 Loaded")
