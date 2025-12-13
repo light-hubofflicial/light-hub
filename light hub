@@ -1,9 +1,10 @@
--- Light Hub v3.7 | ESP Refresh FIXED (Every 5 Seconds - Full Rebuild)
+-- Light Hub v3.10 | Fullbright Toggle Added | ESP Refresh Every 5 Seconds
 -- Press K / Insert or click LH to toggle menu
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 local player = Players.LocalPlayer
 
 local flying = false
@@ -11,6 +12,7 @@ local noclipping = false
 local infJump = false
 local espEnabled = false
 local fastWalk = false
+local fullbright = false
 local flySpeed = 50
 local normalWS = 16
 local fastWS = 100
@@ -19,6 +21,12 @@ local floatBtn = nil
 local BV, BG, flyConn, noclipConn = nil, nil, nil, nil
 local speedConn = nil
 local espObjects = {}
+
+local savedBrightness = Lighting.Brightness
+local savedClockTime = Lighting.ClockTime
+local savedFogEnd = Lighting.FogEnd
+local savedGlobalShadows = Lighting.GlobalShadows
+local savedAmbient = Lighting.Ambient
 
 local function getChar() return player.Character end
 local function getHumanoid() local c = getChar(); return c and c:FindFirstChild("Humanoid") end
@@ -148,6 +156,32 @@ local function toggleSpeed()
     applySpeed()
 end
 
+-- FULLBRIGHT TOGGLE
+local function startFullbright()
+    if fullbright then return end
+    fullbright = true
+    savedBrightness = Lighting.Brightness
+    savedClockTime = Lighting.ClockTime
+    savedFogEnd = Lighting.FogEnd
+    savedGlobalShadows = Lighting.GlobalShadows
+    savedAmbient = Lighting.Ambient
+
+    Lighting.Brightness = 3
+    Lighting.ClockTime = 12
+    Lighting.FogEnd = 100000
+    Lighting.GlobalShadows = false
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+end
+
+local function stopFullbright()
+    fullbright = false
+    Lighting.Brightness = savedBrightness
+    Lighting.ClockTime = savedClockTime
+    Lighting.FogEnd = savedFogEnd
+    Lighting.GlobalShadows = savedGlobalShadows
+    Lighting.Ambient = savedAmbient
+end
+
 -- ESP - FULL REBUILD EVERY 5 SECONDS (FIXED)
 local function createESP(plr)
     if plr == player or espObjects[plr] then return end
@@ -207,11 +241,10 @@ end
 
 local function fullRefreshESP()
     if not espEnabled then return end
-    -- Destroy all old ESP
     for p, _ in pairs(espObjects) do
         removeESP(p)
     end
-    -- Create new for all current players
+    espObjects = {}
     for _, p in Players:GetPlayers() do
         if p ~= player then
             createESP(p)
@@ -225,6 +258,7 @@ local function toggleESP()
         fullRefreshESP()
     else
         for p, _ in pairs(espObjects) do removeESP(p) end
+        espObjects = {}
     end
 end
 
@@ -235,15 +269,13 @@ Players.PlayerAdded:Connect(function(p)
 end)
 Players.PlayerRemoving:Connect(removeESP)
 
--- Refresh every 5 seconds when enabled
-spawn(function()
-    while true do
-        wait(5)
+task.spawn(function()
+    while task.wait(5) do
         fullRefreshESP()
     end
 end)
 
--- GUI (unchanged)
+-- GUI WITH FULLBRIGHT ROW
 local function createGUI()
     local floatGui = Instance.new("ScreenGui")
     floatGui.Name = "LightHub_Float"
@@ -275,8 +307,8 @@ local function createGUI()
     mainGui.Parent = player:WaitForChild("PlayerGui")
 
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 370, 0, 380)
-    main.Position = UDim2.new(0.5, -185, 0.5, -190)
+    main.Size = UDim2.new(0, 370, 0, 428) -- Extra space for new row
+    main.Position = UDim2.new(0.5, -185, 0.5, -214)
     main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     main.Active = true
     main.Draggable = true
@@ -289,7 +321,7 @@ local function createGUI()
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 35)
     title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    title.Text = "Light Hub v3.7 | ESP Refresh FIXED"
+    title.Text = "Light Hub v3.10 | Fullbright Added"
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 16
@@ -325,7 +357,8 @@ local function createGUI()
                           (name == "Noclip" and noclipping) or
                           (name == "Inf Jump" and infJump) or
                           (name == "Speed" and fastWalk) or
-                          (name == "ESP" and espEnabled)
+                          (name == "ESP" and espEnabled) or
+                          (name == "Fullbright" and fullbright)
             btn.Text = state and "ON" or "OFF"
             btn.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
             label.Text = name .. ": " .. btn.Text
@@ -356,6 +389,7 @@ local function createGUI()
     addRow("Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
     addRow("Inf Jump", function() infJump = not infJump end, false)
     addRow("ESP", toggleESP, false)
+    addRow("Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
 
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
@@ -372,4 +406,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v3.7 Loaded | ESP Refresh FIXED Every 5 Seconds")
+print("Light Hub v3.10 Loaded | Fullbright Toggle Added")
