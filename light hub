@@ -1,10 +1,11 @@
--- Light Hub v2 | Fun Tab & Fling Removed | Left Tabs | FOV Persistent & Max 200 --
+-- Light Hub v2 | Fun Tab & Fling Removed | Left Tabs | FOV Persistent & Max 200 | Optimization Tab Added
 -- Press K / Insert or click LH to toggle menu
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 local flying = false
@@ -14,6 +15,8 @@ local espEnabled = false
 local fastWalk = false
 local fullbright = false
 local fovEnabled = false
+local optimizeEnabled = false
+local antiLagEnabled = false
 
 local flySpeed = 50
 local normalWS = 16
@@ -35,6 +38,9 @@ local currentFOV = originalFOV
 local minFOV = 30
 local maxFOV = 200
 
+local renderConn = nil
+local propConn = nil
+
 local function getChar() return player.Character end
 local function getHumanoid() local c = getChar(); return c and c:FindFirstChild("Humanoid") end
 local function getRoot() local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
@@ -46,19 +52,29 @@ player.CharacterAdded:Connect(function()
     fastWalk = false
     if speedConn then speedConn:Disconnect(); speedConn = nil end
     if getHumanoid() then getHumanoid().WalkSpeed = normalWS end
-
+    
     if fovEnabled then
         workspace.CurrentCamera.FieldOfView = currentFOV
+        -- Re-connect forcing if enabled
+        if renderConn then renderConn:Disconnect() end
+        if propConn then propConn:Disconnect() end
+        renderConn = RunService.RenderStepped:Connect(function()
+            workspace.CurrentCamera.FieldOfView = currentFOV
+        end)
+        propConn = workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            workspace.CurrentCamera.FieldOfView = currentFOV
+        end)
+    else
+        workspace.CurrentCamera.FieldOfView = originalFOV
     end
 end)
 
--- Make FOV persistent (doesn't reset when opening menus, shops, etc.)
+-- FOV persistent
 RunService.RenderStepped:Connect(function()
     if fovEnabled and workspace.CurrentCamera then
         workspace.CurrentCamera.FieldOfView = currentFOV
     end
 end)
-
 workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
     if fovEnabled then
         workspace.CurrentCamera.FieldOfView = currentFOV
@@ -86,14 +102,12 @@ local function startFly()
         if not flying or not getRoot() then stopFly(); return end
         BG.CFrame = workspace.CurrentCamera.CFrame
         local move = Vector3.new()
-        if UserInputService.KeyboardEnabled then
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += workspace.CurrentCamera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= workspace.CurrentCamera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= workspace.CurrentCamera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += workspace.CurrentCamera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
-        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += workspace.CurrentCamera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= workspace.CurrentCamera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= workspace.CurrentCamera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += workspace.CurrentCamera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
         if move.Magnitude > 0 then
             BV.Velocity = move.Unit * flySpeed
         else
@@ -111,7 +125,7 @@ local function stopFly()
     if hum then hum.PlatformStand = false end
 end
 
--- NOCLIP
+-- NOCLIP (FIXED: Properly re-enables collision when turned OFF)
 local function startNoclip()
     if noclipping then return end
     noclipping = true
@@ -119,7 +133,9 @@ local function startNoclip()
         local char = getChar()
         if char then
             for _, p in pairs(char:GetDescendants()) do
-                if p:IsA("BasePart") then p.CanCollide = false end
+                if p:IsA("BasePart") then
+                    p.CanCollide = false
+                end
             end
         end
     end)
@@ -127,7 +143,30 @@ end
 
 local function stopNoclip()
     noclipping = false
-    if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+    if noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    -- Re-enable collision on all parts (immediate + delayed for safety)
+    local char = getChar()
+    if char then
+        for _, p in pairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.CanCollide = true
+            end
+        end
+    end
+    -- Extra delayed re-enable in case parts load late
+    task.delay(0.1, function()
+        local char = getChar()
+        if char then
+            for _, p in pairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.CanCollide = true
+                end
+            end
+        end
+    end)
 end
 
 -- INFINITE JUMP
@@ -253,11 +292,45 @@ Players.PlayerAdded:Connect(function(p)
         p.CharacterAdded:Connect(function() createESP(p) end)
     end
 end)
+
 Players.PlayerRemoving:Connect(removeESP)
 
 task.spawn(function()
     while task.wait(5) do fullRefreshESP() end
 end)
+
+-- OPTIMIZATION FEATURES
+local function toggleOptimize(state)
+    optimizeEnabled = state
+    if optimizeEnabled then
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+        Lighting.Brightness = 3
+    else
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+        Lighting.GlobalShadows = savedGlobalShadows
+        Lighting.FogEnd = savedFogEnd
+        Lighting.Brightness = savedBrightness
+    end
+end
+
+local function toggleAntiLag(state)
+    antiLagEnabled = state
+    if antiLagEnabled then
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                obj.Enabled = false
+            end
+        end
+    else
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                obj.Enabled = true
+            end
+        end
+    end
+end
 
 -- GUI
 local function createGUI()
@@ -338,6 +411,17 @@ local function createGUI()
     visualsTab.Parent = tabPanel
     Instance.new("UICorner", visualsTab).CornerRadius = UDim.new(0, 8)
 
+    local optimizationTab = Instance.new("TextButton")
+    optimizationTab.Size = UDim2.new(1, 0, 0, 50)
+    optimizationTab.Position = UDim2.new(0, 0, 0, 100)
+    optimizationTab.BackgroundColor3 = Color3.new(0, 0, 0)
+    optimizationTab.Text = "Optimization"
+    optimizationTab.TextColor3 = Color3.new(1, 1, 1)
+    optimizationTab.Font = Enum.Font.GothamBold
+    optimizationTab.TextSize = 18
+    optimizationTab.Parent = tabPanel
+    Instance.new("UICorner", optimizationTab).CornerRadius = UDim.new(0, 8)
+
     local contentArea = Instance.new("Frame")
     contentArea.Size = UDim2.new(1, -120, 1, -35)
     contentArea.Position = UDim2.new(0, 120, 0, 35)
@@ -356,24 +440,50 @@ local function createGUI()
     visualsContent.Visible = false
     visualsContent.Parent = contentArea
 
+    local optimizationContent = Instance.new("Frame")
+    optimizationContent.Size = UDim2.new(1, 0, 1, 0)
+    optimizationContent.BackgroundTransparency = 1
+    optimizationContent.Visible = false
+    optimizationContent.Parent = contentArea
+
+    -- Tab switching
     movementTab.MouseButton1Click:Connect(function()
         movementContent.Visible = true
         visualsContent.Visible = false
+        optimizationContent.Visible = false
         movementTab.BackgroundColor3 = Color3.new(1, 1, 1)
         movementTab.TextColor3 = Color3.new(0, 0, 0)
         visualsTab.BackgroundColor3 = Color3.new(0, 0, 0)
         visualsTab.TextColor3 = Color3.new(1, 1, 1)
+        optimizationTab.BackgroundColor3 = Color3.new(0, 0, 0)
+        optimizationTab.TextColor3 = Color3.new(1, 1, 1)
     end)
 
     visualsTab.MouseButton1Click:Connect(function()
         movementContent.Visible = false
         visualsContent.Visible = true
+        optimizationContent.Visible = false
         movementTab.BackgroundColor3 = Color3.new(0, 0, 0)
         movementTab.TextColor3 = Color3.new(1, 1, 1)
         visualsTab.BackgroundColor3 = Color3.new(1, 1, 1)
         visualsTab.TextColor3 = Color3.new(0, 0, 0)
+        optimizationTab.BackgroundColor3 = Color3.new(0, 0, 0)
+        optimizationTab.TextColor3 = Color3.new(1, 1, 1)
     end)
 
+    optimizationTab.MouseButton1Click:Connect(function()
+        movementContent.Visible = false
+        visualsContent.Visible = false
+        optimizationContent.Visible = true
+        movementTab.BackgroundColor3 = Color3.new(0, 0, 0)
+        movementTab.TextColor3 = Color3.new(1, 1, 1)
+        visualsTab.BackgroundColor3 = Color3.new(0, 0, 0)
+        visualsTab.TextColor3 = Color3.new(1, 1, 1)
+        optimizationTab.BackgroundColor3 = Color3.new(1, 1, 1)
+        optimizationTab.TextColor3 = Color3.new(0, 0, 0)
+    end)
+
+    -- Row function
     local function addRow(parent, name, toggleFunc, hasTextBox, defaultValue)
         local rowCount = #parent:GetChildren()
         local yPos = rowCount * 48 + 10
@@ -403,7 +513,7 @@ local function createGUI()
 
         btn.MouseButton1Click:Connect(function()
             toggleFunc()
-            local state = (name == "Fly" and flying) or (name == "Speed" and fastWalk) or (name == "Noclip" and noclipping) or (name == "Inf Jump" and infJump) or (name == "ESP" and espEnabled) or (name == "Fullbright" and fullbright) or (name == "FOV" and fovEnabled)
+            local state = (name == "Fly" and flying) or (name == "Speed" and fastWalk) or (name == "Noclip" and noclipping) or (name == "Inf Jump" and infJump) or (name == "ESP" and espEnabled) or (name == "Fullbright" and fullbright) or (name == "Optimize" and optimizeEnabled) or (name == "Anti Lag" and antiLagEnabled)
             btn.Text = state and "ON" or "OFF"
             btn.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
             label.Text = name .. ": " .. btn.Text
@@ -429,6 +539,21 @@ local function createGUI()
         end
     end
 
+    -- Movement Tab
+    addRow(movementContent, "Fly", function() if flying then stopFly() else startFly() end end, true, "50")
+    addRow(movementContent, "Speed", toggleSpeed, true, "100")
+    addRow(movementContent, "Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
+    addRow(movementContent, "Inf Jump", function() infJump = not infJump end, false)
+
+    -- Visuals Tab
+    addRow(visualsContent, "ESP", toggleESP, false)
+    addRow(visualsContent, "Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
+
+    -- Optimization Tab
+    addRow(optimizationContent, "Optimize", function() toggleOptimize(not optimizeEnabled) end, false)
+    addRow(optimizationContent, "Anti Lag", function() toggleAntiLag(not antiLagEnabled) end, false)
+
+    -- FOV Row in Visuals Tab
     local function addFOVRow(parent)
         local rowCount = #parent:GetChildren()
         local yPos = rowCount * 48 + 10
@@ -471,6 +596,9 @@ local function createGUI()
             if val then
                 currentFOV = math.clamp(math.floor(val), minFOV, maxFOV)
                 fovBox.Text = tostring(currentFOV)
+                if fovEnabled then
+                    workspace.CurrentCamera.FieldOfView = currentFOV
+                end
             else
                 fovBox.Text = tostring(currentFOV)
             end
@@ -481,18 +609,30 @@ local function createGUI()
             toggleBtn.Text = fovEnabled and "ON" or "OFF"
             toggleBtn.BackgroundColor3 = fovEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
             label.Text = "FOV: " .. toggleBtn.Text
+
+            if fovEnabled then
+                -- Connect forcing loops
+                if renderConn then renderConn:Disconnect() end
+                if propConn then propConn:Disconnect() end
+                renderConn = RunService.RenderStepped:Connect(function()
+                    workspace.CurrentCamera.FieldOfView = currentFOV
+                end)
+                propConn = workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+                    workspace.CurrentCamera.FieldOfView = currentFOV
+                end)
+                workspace.CurrentCamera.FieldOfView = currentFOV
+            else
+                -- Disconnect forcing loops (no more overhead = no lag)
+                if renderConn then renderConn:Disconnect(); renderConn = nil end
+                if propConn then propConn:Disconnect(); propConn = nil end
+                workspace.CurrentCamera.FieldOfView = originalFOV
+            end
         end)
     end
 
-    addRow(movementContent, "Fly", function() if flying then stopFly() else startFly() end end, true, "50")
-    addRow(movementContent, "Speed", toggleSpeed, true, "100")
-    addRow(movementContent, "Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
-    addRow(movementContent, "Inf Jump", function() infJump = not infJump end, false)
-
-    addRow(visualsContent, "ESP", toggleESP, false)
-    addRow(visualsContent, "Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
     addFOVRow(visualsContent)
 
+    -- Toggle Menu
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
     end
@@ -507,4 +647,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v2 Loaded | All Features + Persistent FOV (Max 200)")
+print("Light Hub v2 Loaded | All Features + Optimization Tab (Anti-Lag) + Fixed Noclip OFF")
