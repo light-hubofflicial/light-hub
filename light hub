@@ -55,7 +55,6 @@ player.CharacterAdded:Connect(function()
     
     if fovEnabled then
         workspace.CurrentCamera.FieldOfView = currentFOV
-        -- Re-connect forcing if enabled
         if renderConn then renderConn:Disconnect() end
         if propConn then propConn:Disconnect() end
         renderConn = RunService.RenderStepped:Connect(function()
@@ -125,7 +124,7 @@ local function stopFly()
     if hum then hum.PlatformStand = false end
 end
 
--- NOCLIP (FIXED: Properly re-enables collision when turned OFF)
+-- NOCLIP (FIXED VERSION)
 local function startNoclip()
     if noclipping then return end
     noclipping = true
@@ -133,7 +132,7 @@ local function startNoclip()
         local char = getChar()
         if char then
             for _, p in pairs(char:GetDescendants()) do
-                if p:IsA("BasePart") then
+                if p:IsA("BasePart") and p.CanCollide then
                     p.CanCollide = false
                 end
             end
@@ -147,26 +146,17 @@ local function stopNoclip()
         noclipConn:Disconnect()
         noclipConn = nil
     end
-    -- Re-enable collision on all parts (immediate + delayed for safety)
+    -- Specifically re-enable only necessary parts to prevent physics flinging
     local char = getChar()
     if char then
-        for _, p in pairs(char:GetDescendants()) do
-            if p:IsA("BasePart") then
-                p.CanCollide = true
+        local coreParts = {"HumanoidRootPart", "Head", "Torso", "UpperTorso", "LowerTorso"}
+        for _, name in ipairs(coreParts) do
+            local part = char:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                part.CanCollide = true
             end
         end
     end
-    -- Extra delayed re-enable in case parts load late
-    task.delay(0.1, function()
-        local char = getChar()
-        if char then
-            for _, p in pairs(char:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CanCollide = true
-                end
-            end
-        end
-    end)
 end
 
 -- INFINITE JUMP
@@ -483,7 +473,6 @@ local function createGUI()
         optimizationTab.TextColor3 = Color3.new(0, 0, 0)
     end)
 
-    -- Row function
     local function addRow(parent, name, toggleFunc, hasTextBox, defaultValue)
         local rowCount = #parent:GetChildren()
         local yPos = rowCount * 48 + 10
@@ -539,21 +528,17 @@ local function createGUI()
         end
     end
 
-    -- Movement Tab
     addRow(movementContent, "Fly", function() if flying then stopFly() else startFly() end end, true, "50")
     addRow(movementContent, "Speed", toggleSpeed, true, "100")
     addRow(movementContent, "Noclip", function() if noclipping then stopNoclip() else startNoclip() end end, false)
     addRow(movementContent, "Inf Jump", function() infJump = not infJump end, false)
 
-    -- Visuals Tab
     addRow(visualsContent, "ESP", toggleESP, false)
     addRow(visualsContent, "Fullbright", function() if fullbright then stopFullbright() else startFullbright() end end, false)
 
-    -- Optimization Tab
     addRow(optimizationContent, "Optimize", function() toggleOptimize(not optimizeEnabled) end, false)
     addRow(optimizationContent, "Anti Lag", function() toggleAntiLag(not antiLagEnabled) end, false)
 
-    -- FOV Row in Visuals Tab
     local function addFOVRow(parent)
         local rowCount = #parent:GetChildren()
         local yPos = rowCount * 48 + 10
@@ -611,7 +596,6 @@ local function createGUI()
             label.Text = "FOV: " .. toggleBtn.Text
 
             if fovEnabled then
-                -- Connect forcing loops
                 if renderConn then renderConn:Disconnect() end
                 if propConn then propConn:Disconnect() end
                 renderConn = RunService.RenderStepped:Connect(function()
@@ -622,7 +606,6 @@ local function createGUI()
                 end)
                 workspace.CurrentCamera.FieldOfView = currentFOV
             else
-                -- Disconnect forcing loops (no more overhead = no lag)
                 if renderConn then renderConn:Disconnect(); renderConn = nil end
                 if propConn then propConn:Disconnect(); propConn = nil end
                 workspace.CurrentCamera.FieldOfView = originalFOV
@@ -632,7 +615,6 @@ local function createGUI()
 
     addFOVRow(visualsContent)
 
-    -- Toggle Menu
     local function toggleMenu()
         mainGui.Enabled = not mainGui.Enabled
     end
@@ -647,4 +629,4 @@ local function createGUI()
 end
 
 createGUI()
-print("Light Hub v2 Loaded | All Features + Optimization Tab (Anti-Lag) + Fixed Noclip OFF")
+print("Light Hub v2 Loaded | Corrected Noclip | Press K/Insert to Toggle")
